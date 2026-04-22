@@ -1,6 +1,9 @@
 #include <glad/gl.h>
 #include <GLFW/glfw3.h>
 #include <iostream>
+#include<GameState.h>
+
+GameManager game;
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
     glViewport(0, 0, width, height);
@@ -35,12 +38,30 @@ int main() {
     }    
 
     // 4. Game Loop
+    float lastFrame = 0;
     while (!glfwWindowShouldClose(window)) {
         processInput(window);
 
-        // Clear the screen to a spooky dark red color
-        glClearColor(0.2f, 0.0f, 0.0f, 1.0f);
+        float currentFrame = glfwGetTime();
+        float deltaTime = currentFrame - lastFrame;
+        lastFrame = currentFrame;
+        game.update(deltaTime);
+
         glClear(GL_COLOR_BUFFER_BIT);
+
+        switch(game.currentState){
+            case GameState::MENU:
+                glClearColor(0.2f, 0.0f, 0.0f, 1.0f);
+                break;
+            case GameState::PLAYING:
+                //Person 1 and 5 code enter here.
+                glClearColor(0.0f,0.0f,0.0f,1.0f);
+                break;
+            case GameState::LOSE:
+                glClearColor(0.5f,0.0f,0.0f,1.0f);
+                break;
+            //Enter win case here, not sure what.
+        }
 
         glfwSwapBuffers(window);
         glfwPollEvents();
