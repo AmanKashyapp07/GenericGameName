@@ -7,6 +7,7 @@
 #include "Maze.h"
 #include "MazeRenderer.h"
 #include "Collision.h"
+#include "PostProcessor.h"
 
 // ----- Globals -----
 GameManager game;
@@ -129,6 +130,18 @@ int main() {
     // ---- Collision ----
     MazeCollision collision(maze, 1.0f, 0.2f);
 
+    // ---- Post-Processing (paper-drawn effect) ----
+    PostProcessor postFX;
+    int initW, initH;
+    glfwGetFramebufferSize(window, &initW, &initH);
+    postFX.init(initW, initH);
+
+    // Visual frame-rate limiting for flipbook feel
+    const float VISUAL_FPS = 12.0f;
+    const float VISUAL_FRAME_TIME = 1.0f / VISUAL_FPS;
+    float visualTimer = 0.0f;
+    bool shouldRenderScene = true;
+
     // ---- Game Loop ----
     float lastFrame = 0.0f;
 
@@ -140,31 +153,47 @@ int main() {
         // Cap delta to avoid physics explosions on lag spikes
         if (deltaTime > 0.1f) deltaTime = 0.1f;
 
+        // Input always runs at full speed
         processInput(window, deltaTime, collision);
         game.update(deltaTime);
 
-        glClearColor(0.04f, 0.04f, 0.03f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        // Visual frame rate limiting — only re-render the 3D scene at 12fps
+        visualTimer += deltaTime;
+        if (visualTimer >= VISUAL_FRAME_TIME) {
+            visualTimer -= VISUAL_FRAME_TIME;
+            shouldRenderScene = true;
+        }
 
-        // Dynamic aspect ratio
+        // Dynamic aspect ratio + resize FBO if needed
         int winW, winH;
         glfwGetFramebufferSize(window, &winW, &winH);
         if (winH == 0) winH = 1;
         float aspect = static_cast<float>(winW) / static_cast<float>(winH);
+        postFX.resize(winW, winH);
 
-        glm::mat4 projection = glm::perspective(glm::radians(60.0f), aspect, 0.1f, 100.0f);
-        glm::mat4 view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
+        if (shouldRenderScene) {
+            shouldRenderScene = false;
 
-        switch (game.currentState) {
-            case GameState::MENU:
-                // Auto-transition handled by GameManager
-                break;
-            case GameState::PLAYING:
-                renderer.render(view, projection, cameraPos);
-                break;
-            case GameState::LOSE:
-                break;
+            glm::mat4 projection = glm::perspective(glm::radians(60.0f), aspect, 0.1f, 100.0f);
+            glm::mat4 view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
+
+            switch (game.currentState) {
+                case GameState::MENU:
+                    break;
+                case GameState::PLAYING:
+                    // Render scene to FBO
+                    postFX.beginSceneRender();
+                    renderer.render(view, projection, cameraPos);
+                    postFX.endSceneRender();
+                    break;
+                case GameState::LOSE:
+                    break;
+            }
         }
+
+        // Always apply post-processing and display (reads from last FBO content)
+        glViewport(0, 0, winW, winH);
+        postFX.applyEffects(currentFrame, VISUAL_FPS);
 
         glfwSwapBuffers(window);
         glfwPollEvents();

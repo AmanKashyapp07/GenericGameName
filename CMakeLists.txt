@@ -32,6 +32,7 @@ add_executable(HorrorGame
     src/Maze.cpp
     src/MazeRenderer.cpp
     src/Collision.cpp
+    src/PostProcessor.cpp
 )
 
 # Include directories
